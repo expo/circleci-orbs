@@ -17,7 +17,7 @@ commands:
 
   status:
     description: |
-      Tracks changes between the current and previous runs of the current job and writes the status change to a file, which contains one of four values:
+      Tracks changes between the current and previous runs of the current job and writes the status change to an environment variable named CIRCLE_JOB_STATUS_CHANGE, with one of four values:
 
         success: the job was previously successful and is still successful
         failed:  the job previously failed and is still failing
@@ -29,11 +29,6 @@ commands:
         description: The directory in which to store files reporting the job status
         type: string
         default: /tmp
-
-      status_file:
-        description: The file, relative to the <directory> in which to write the job status change
-        type: string
-        default: job_status_change
     
     steps:
       - run:
@@ -46,7 +41,7 @@ commands:
               && job_status_change=success \
               || job_status_change=fixed
             echo 0 > "<< parameters.directory >>/job_status"
-            echo "$job_status_change" > "<< parameters.directory >>/<< parameters.status_file >>"
+            echo "export CIRCLE_JOB_STATUS_CHANGE=\"$job_status_change\"" >> "$BASH_ENV"
       - run:
           name: Record failed job
           when: on_fail
@@ -54,12 +49,11 @@ commands:
             [ -f "<< parameters.directory >>/job_status" ] \
               && previous_job_status=$(cat "<< parameters.directory >>/job_status") \
               || true
-            echo $previous_job_status
             [ "${previous_job_status:-1}" -eq 1 ] \
               && job_status_change=failed \
               || job_status_change=broke
             echo 1 > "<< parameters.directory >>/job_status"
-            echo "$job_status_change" > "<< parameters.directory >>/<< parameters.status_file >>"
+            echo "export CIRCLE_JOB_STATUS_CHANGE=\"$job_status_change\"" >> "$BASH_ENV"
       - run:
           name: Record job name
           when: always

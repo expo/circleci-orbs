@@ -1,0 +1,71 @@
+version: 2.1
+
+description: Tracks changes in job statuses between consecutive runs.
+
+commands:
+  prepare:
+    description: Retrieves the status of the last run of this job. Run this command early in your job before steps that you expect to possibly fail.
+
+    steps:
+      - run:
+          name: Record job name
+          when: always
+          command: echo "$CIRCLE_JOB" > /tmp/job_name
+      - restore_cache:
+          when: always
+          key: build-status-v0-{{ .Branch }}-{{ checksum "/tmp/job_name" }}-
+
+  status:
+    description: |
+      Tracks changes between the current and previous runs of the current job and writes the status change to a file, which contains one of four values:
+
+        success: the job was previously successful and is still successful
+        failed:  the job previously failed and is still failing
+        fixed:   the job previously failed but is now successful
+        broke:   the job was previously successful but is now failing
+
+    parameters:
+      directory:
+        description: The directory in which to store files reporting the job status
+        type: string
+        default: /tmp
+
+      status_file:
+        description: The file, relative to the <directory> in which to write the job status change
+        type: string
+        default: job_status_change
+    
+    steps:
+      - run:
+          name: Record successful job
+          command: |
+            [ -f "<< parameters.directory >>/job_status" ] \
+              && previous_job_status=$(cat "<< parameters.directory >>/job_status") \
+              || true
+            [ "${previous_job_status:-0}" -eq 0 ] \
+              && job_status_change=success \
+              || job_status_change=fixed
+            echo 0 > "<< parameters.directory >>/job_status"
+            echo "$job_status_change" > "<< parameters.directory >>/<< parameters.status_file >>"
+      - run:
+          name: Record failed job
+          when: on_fail
+          command: |
+            [ -f "<< parameters.directory >>/job_status" ] \
+              && previous_job_status=$(cat "<< parameters.directory >>/job_status") \
+              || true
+            echo $previous_job_status
+            [ "${previous_job_status:-1}" -eq 1 ] \
+              && job_status_change=failed \
+              || job_status_change=broke
+            echo 1 > "<< parameters.directory >>/job_status"
+            echo "$job_status_change" > "<< parameters.directory >>/<< parameters.status_file >>"
+      - run:
+          name: Record job name
+          when: always
+          command: echo "$CIRCLE_JOB" > /tmp/job_name
+      - save_cache:
+          when: always
+          key: build-status-v0-{{ .Branch }}-{{ checksum "/tmp/job_name" }}-{{ epoch }}
+          paths:
+            - << parameters.directory >>/job_status

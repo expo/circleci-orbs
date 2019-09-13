@@ -1,0 +1,89 @@
+version: 2.1
+
+description: Notifies Slack of a change in the job status between consecutive runs.
+
+commands:
+  notify:
+    description: Notifies Slack of a change in job status. "curl" and "jq" must be installed and available though "$PATH".
+
+    parameters:
+      only_for_branches:
+        description: An optional comma-separated (no spaces) list of branches on which to send notifications
+        type: string
+        default: ''
+      job_status_change:
+        description: |
+          The change in job status. Must be one of four values: "success", "failed", "fixed", or "broke". Defaults to the value of "$CIRCLE_JOB_STATUS_CHANGE", which expo/job-status-change defines.
+        type: string
+        default: $CIRCLE_JOB_STATUS_CHANGE
+      slack_webhook:
+        description: The URL of the Slack webhook to which to send the message
+        type: string
+        default: $SLACK_WEBHOOK
+    
+    steps:
+      - run:
+          name: Send message to Slack
+          when: always
+          only_for_branches: << parameters.only_for_branches >>
+          command: |
+            # Create the JSON to send to Slack
+            if [ "<< parameters.job_status_change >>" = fixed ]; then
+              slack_title="💙 $CIRCLE_JOB was fixed on $CIRCLE_BRANCH (build #$CIRCLE_BUILD_NUM)"
+              slack_title_link="$CIRCLE_BUILD_URL"
+              slack_text="Thank you for fixing CI."
+              slack_fallback="$CIRCLE_USERNAME fixed the $CIRCLE_JOB build - $CIRCLE_BUILD_URL"
+              slack_color=good
+            elif [ "<< parameters.job_status_change >>" = broke ]; then
+              slack_title="⚠️ $CIRCLE_JOB failed on $CIRCLE_BRANCH (build #$CIRCLE_BUILD_NUM)"
+              slack_title_link="$CIRCLE_BUILD_URL"
+              slack_text="Please investigate and fix the root cause if you merged this commit to $CIRCLE_BRANCH. If the root cause can't be fixed momentarily, revert the offending commit(s) to restore CI."
+              slack_fallback="$CIRCLE_USERNAME's $CIRCLE_JOB build failed - $CIRCLE_BUILD_URL"
+              slack_color=danger
+            else
+              exit 0
+            fi
+
+            jq --null-input \
+              --arg title "$slack_title" \
+              --arg title_link "$slack_title_link" \
+              --arg text "$slack_text" \
+              --arg fallback "$slack_fallback" \
+              --arg git_commit_subject "$(git show --format=%s --quiet)" \
+              --arg color "$slack_color" \
+              "{ \
+                \"attachments\": [ \
+                  { \
+                    \"title\": \$title, \
+                    \"title_link\": \$title_link, \
+                    \"text\": \$text, \
+                    \"fallback\": \$fallback, \
+                    \"fields\": [ \
+                      { \
+                        \"title\": \"Committer\", \
+                        \"value\": \"$CIRCLE_USERNAME\", \
+                        \"short\": true \
+                      }, \
+                      { \
+                        \"title\": \"Subject\", \
+                        \"value\": \$git_commit_subject, \
+                        \"short\": true \
+                      }, \
+                      { \
+                        \"title\": \"Commit\", \
+                        \"value\": \"https://github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME/commit/$CIRCLE_SHA1\", \
+                        \"short\": true \
+                      } \
+                    ], \
+                    \"color\": \$color \
+                  } \
+                ] \
+              }" > "$TMPDIR/slack-message.json"
+            
+            cat "$TMPDIR/slack-message.json"
+
+            # Send the message to Slack
+            curl -X POST -H 'content-type: application/json' \
+              --data "@$TMPDIR/slack-message.json" \
+              << parameters.slack_webhook >> || \
+            true # Never let notification failures determine job status

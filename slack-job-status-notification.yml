@@ -8,7 +8,7 @@ commands:
 
     parameters:
       only_for_branches:
-        description: An optional comma-separated (no spaces) list of branches on which to send notifications
+        description: An optional space-separated list of branches on which to send notifications. Bash glob syntax is supported.
         type: string
         default: ''
       job_status_change:
@@ -25,8 +25,23 @@ commands:
       - run:
           name: Send message to Slack
           when: always
-          only_for_branches: << parameters.only_for_branches >>
           command: |
+            # Exit if branch patterns were provided and none of them match the current branch
+            if [ -n "<< parameters.only_for_branches >>" ]; then
+              is_matched_branch=false
+
+              read -ra branch_globs \<<< "<< parameters.only_for_branches >>"
+              for branch_glob in "${branch_globs[@]}"; do
+                # We don't double-quote $branch_glob because we want to match the glob pattern instead
+                # of a string literal
+                if [[ "$CIRCLE_BRANCH" = $branch_glob ]]; then
+                  is_matched_branch=true
+                fi
+              done
+
+              [ "$is_matched_branch" = false ] && exit 0
+            fi
+
             # Create the JSON to send to Slack
             if [ "<< parameters.job_status_change >>" = fixed ]; then
               slack_title="💙 $CIRCLE_JOB was fixed on $CIRCLE_BRANCH (build #$CIRCLE_BUILD_NUM)"

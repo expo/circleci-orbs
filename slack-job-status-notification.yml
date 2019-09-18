@@ -32,14 +32,15 @@ commands:
 
               read -ra branch_globs \<<< "<< parameters.only_for_branches >>"
               for branch_glob in "${branch_globs[@]}"; do
-                # We don't double-quote $branch_glob because we want to match the glob pattern instead
-                # of a string literal
+                # We don't double-quote $branch_glob because we want to match the glob pattern
+                # instead of a string literal
                 if [[ "$CIRCLE_BRANCH" = $branch_glob ]]; then
                   is_matched_branch=true
                 fi
               done
 
               if [ "$is_matched_branch" = false ]; then
+                echo "Skipping Slack notifications for the $CIRCLE_BRANCH branch"
                 set +e
                 exit 0
               fi
@@ -59,10 +60,12 @@ commands:
               slack_fallback="$CIRCLE_USERNAME's $CIRCLE_JOB build failed - $CIRCLE_BUILD_URL"
               slack_color=danger
             else
+              echo "Skipping Slack notifications because the change in job status is \"<< parameters.job_status_change >>\""
               set +e
               exit 0
             fi
 
+            echo "Notifying Slack because the change in job status is \"<< parameters.job_status_change >>\""
             jq --null-input \
               --arg title "$slack_title" \
               --arg title_link "$slack_title_link" \
@@ -98,8 +101,6 @@ commands:
                   } \
                 ] \
               }" > "$TMPDIR/slack-message.json"
-            
-            cat "$TMPDIR/slack-message.json"
 
             # Send the message to Slack
             curl -X POST -H 'content-type: application/json' \

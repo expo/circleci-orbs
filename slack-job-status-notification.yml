@@ -39,7 +39,10 @@ commands:
                 fi
               done
 
-              [ "$is_matched_branch" = false ] && exit 0
+              if [ "$is_matched_branch" = false ]; then
+                set +e
+                exit 0
+              fi
             fi
 
             # Create the JSON to send to Slack
@@ -56,6 +59,7 @@ commands:
               slack_fallback="$CIRCLE_USERNAME's $CIRCLE_JOB build failed - $CIRCLE_BUILD_URL"
               slack_color=danger
             else
+              set +e
               exit 0
             fi
 

@@ -10,10 +10,10 @@ commands:
       - run:
           name: Record job name
           when: always
-          command: echo "$CIRCLE_JOB" > /tmp/job_name
+          command: echo "$CIRCLE_JOB" > /tmp/.ci_job_name
       - restore_cache:
           when: always
-          key: build-status-v0-{{ .Branch }}-{{ checksum "/tmp/job_name" }}-
+          key: build-status-v0-{{ .Branch }}-{{ checksum "/tmp/.ci_job_name" }}-
 
   status:
     description: |
@@ -28,38 +28,38 @@ commands:
       directory:
         description: The directory in which to store files reporting the job status
         type: string
-        default: /tmp
+        default: .
     
     steps:
       - run:
           name: Record successful job
           command: |
-            [ -f "<< parameters.directory >>/job_status" ] \
-              && previous_job_status=$(cat "<< parameters.directory >>/job_status") \
+            [ -f "<< parameters.directory >>/.ci_job_status" ] \
+              && previous_job_status=$(cat "<< parameters.directory >>/.ci_job_status") \
               || true
             [ "${previous_job_status:-0}" -eq 0 ] \
               && job_status_change=success \
               || job_status_change=fixed
-            echo 0 > "<< parameters.directory >>/job_status"
+            echo 0 > "<< parameters.directory >>/.ci_job_status"
             echo "export CIRCLE_JOB_STATUS_CHANGE=\"$job_status_change\"" >> "$BASH_ENV"
       - run:
           name: Record failed job
           when: on_fail
           command: |
-            [ -f "<< parameters.directory >>/job_status" ] \
-              && previous_job_status=$(cat "<< parameters.directory >>/job_status") \
+            [ -f "<< parameters.directory >>/.ci_job_status" ] \
+              && previous_job_status=$(cat "<< parameters.directory >>/.ci_job_status") \
               || true
             [ "${previous_job_status:-1}" -eq 1 ] \
               && job_status_change=failed \
               || job_status_change=broke
-            echo 1 > "<< parameters.directory >>/job_status"
+            echo 1 > "<< parameters.directory >>/.ci_job_status"
             echo "export CIRCLE_JOB_STATUS_CHANGE=\"$job_status_change\"" >> "$BASH_ENV"
       - run:
           name: Record job name
           when: always
-          command: echo "$CIRCLE_JOB" > /tmp/job_name
+          command: echo "$CIRCLE_JOB" > /tmp/.ci_job_name
       - save_cache:
           when: always
-          key: build-status-v0-{{ .Branch }}-{{ checksum "/tmp/job_name" }}-{{ epoch }}
+          key: build-status-v0-{{ .Branch }}-{{ checksum "/tmp/.ci_job_name" }}-{{ epoch }}
           paths:
-            - << parameters.directory >>/job_status
+            - << parameters.directory >>/.ci_job_status

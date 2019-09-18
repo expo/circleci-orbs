@@ -13,7 +13,7 @@ commands:
           command: echo "$CIRCLE_JOB" > /tmp/.ci_job_name
       - restore_cache:
           when: always
-          key: build-status-v0-{{ .Branch }}-{{ checksum "/tmp/.ci_job_name" }}-
+          key: build-status-v1-{{ .Branch }}-{{ checksum "/tmp/.ci_job_name" }}-
 
   status:
     description: |
@@ -28,7 +28,7 @@ commands:
       directory:
         description: The directory in which to store files reporting the job status
         type: string
-        default: .
+        default: $HOME
     
     steps:
       - run:
@@ -60,6 +60,6 @@ commands:
           command: echo "$CIRCLE_JOB" > /tmp/.ci_job_name
       - save_cache:
           when: always
-          key: build-status-v0-{{ .Branch }}-{{ checksum "/tmp/.ci_job_name" }}-{{ epoch }}
+          key: build-status-v1-{{ .Branch }}-{{ checksum "/tmp/.ci_job_name" }}-{{ epoch }}
           paths:
             - << parameters.directory >>/.ci_job_status

@@ -23,7 +23,7 @@ commands:
     
     steps:
       - run:
-          name: Send message to Slack
+          name: Conditionally send message to Slack
           when: always
           command: |
             # Exit if branch patterns were provided and none of them match the current branch

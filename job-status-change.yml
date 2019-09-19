@@ -3,18 +3,6 @@ version: 2.1
 description: Tracks changes in job statuses between consecutive runs.
 
 commands:
-  prepare:
-    description: Retrieves the status of the last run of this job. Run this command early in your job before steps that you expect to possibly fail.
-
-    steps:
-      - run:
-          name: Record job name
-          when: always
-          command: echo "$CIRCLE_JOB" > /tmp/.ci_job_name
-      - restore_cache:
-          when: always
-          key: build-status-v1-{{ .Branch }}-{{ checksum "/tmp/.ci_job_name" }}-
-
   status:
     description: |
       Tracks changes between the current and previous runs of the current job and writes the status change to an environment variable named CIRCLE_JOB_STATUS_CHANGE, with one of four values:
@@ -28,9 +16,16 @@ commands:
       directory:
         description: The directory in which to store files reporting the job status
         type: string
-        default: $HOME
+        default: .
     
     steps:
+      - run:
+          name: Record job name
+          when: always
+          command: echo "$CIRCLE_JOB" > /tmp/.ci_job_name
+      - restore_cache:
+          when: always
+          key: build-status-v1-{{ .Branch }}-{{ checksum "/tmp/.ci_job_name" }}-
       - run:
           name: Record successful job
           command: |
@@ -54,10 +49,6 @@ commands:
               || job_status_change=broke
             echo 1 > "<< parameters.directory >>/.ci_job_status"
             echo "export CIRCLE_JOB_STATUS_CHANGE=\"$job_status_change\"" >> "$BASH_ENV"
-      - run:
-          name: Record job name
-          when: always
-          command: echo "$CIRCLE_JOB" > /tmp/.ci_job_name
       - save_cache:
           when: always
           key: build-status-v1-{{ .Branch }}-{{ checksum "/tmp/.ci_job_name" }}-{{ epoch }}

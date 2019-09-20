@@ -100,10 +100,10 @@ commands:
                     \"color\": \$color \
                   } \
                 ] \
-              }" > "$TMPDIR/slack-message.json"
+              }" > "/tmp/slack-message.json"
 
             # Send the message to Slack
             curl -X POST -H 'content-type: application/json' \
-              --data "@$TMPDIR/slack-message.json" \
+              --data "@/tmp/slack-message.json" \
               << parameters.slack_webhook >> || \
             true # Never let notification failures determine job status
